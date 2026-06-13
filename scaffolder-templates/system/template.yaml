@@ -1,0 +1,86 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: system-template
+  title: Register a New System
+  description: Register a new system in the Backstage catalog and create its GitHub repository
+  tags:
+    - backstage
+    - catalog
+    - system
+spec:
+  owner: group:default/platform-team
+  type: catalog
+  parameters:
+    - title: System Details
+      required:
+        - system
+        - domain
+        - owner
+      properties:
+        system:
+          title: System Name
+          type: string
+          description: Unique name for this system (lowercase, no spaces)
+          pattern: '^[a-z0-9-]+$'
+        description:
+          title: Description
+          type: string
+          description: What does this system do?
+        domain:
+          title: Domain
+          type: string
+          description: Business domain this system belongs to
+        owner:
+          title: Owner
+          type: string
+          description: Team responsible for this system
+          ui:field: OwnerPicker
+          ui:options:
+            allowedKinds:
+              - Group
+    - title: Repository Location
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+            allowedOwners:
+              - polarpoint-io
+  steps:
+    - id: fetch
+      name: Fetch System Template
+      action: fetch:template
+      input:
+        url: ./
+        values:
+          system: ${{ parameters.system }}
+          domain: ${{ parameters.domain }}
+          owner: ${{ parameters.owner }}
+          description: ${{ parameters.description }}
+
+    - id: publish
+      name: Publish to GitHub
+      action: publish:github
+      input:
+        allowedHosts:
+          - github.com
+        description: System catalog entry for ${{ parameters.system }}
+        repoUrl: ${{ parameters.repoUrl }}
+
+    - id: register
+      name: Register in Catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/${{ parameters.system }}.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}

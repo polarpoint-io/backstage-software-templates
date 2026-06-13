@@ -1,0 +1,88 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: gcp-cloudsql-template
+  title: GCP CloudSQL PostgreSQL (Crossplane)
+  description: Provision a GCP CloudSQL PostgreSQL instance via Crossplane
+  tags:
+    - gcp
+    - cloudsql
+    - postgresql
+    - crossplane
+    - infrastructure
+spec:
+  owner: group:default/platform-team
+  type: infrastructure
+  parameters:
+    - title: CloudSQL Instance Details
+      required:
+        - system
+        - env
+        - owner
+      properties:
+        system:
+          title: System Name
+          type: string
+          description: Name of the system this database belongs to (lowercase, no spaces)
+          pattern: '^[a-z0-9-]+$'
+        env:
+          title: Environment
+          type: string
+          description: Target environment
+          enum:
+            - dev
+            - staging
+            - prod
+          default: dev
+        owner:
+          title: Owner
+          type: string
+          description: Owner team for this resource
+          ui:field: OwnerPicker
+          ui:options:
+            allowedKinds:
+              - Group
+    - title: Repository Location
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Repository Location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+            allowedOwners:
+              - polarpoint-io
+  steps:
+    - id: fetch
+      name: Fetch Crossplane Manifests
+      action: fetch:template
+      input:
+        url: ./
+        values:
+          system: ${{ parameters.system }}
+          env: ${{ parameters.env }}
+          owner: ${{ parameters.owner }}
+
+    - id: publish
+      name: Publish to GitHub
+      action: publish:github
+      input:
+        allowedHosts:
+          - github.com
+        description: Crossplane CloudSQL manifests for ${{ parameters.system }}-${{ parameters.env }}
+        repoUrl: ${{ parameters.repoUrl }}
+
+    - id: register
+      name: Register in Catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: '/catalog-info.yaml'
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
